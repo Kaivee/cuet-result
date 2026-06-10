@@ -92,6 +92,8 @@ export function compareAnswers(
       subject: responseEntry.subject,
       optionIds: [...optionIds],
       chosenOptionIndex,
+      questionText: responseEntry.questionText,
+      optionsText: responseEntry.optionsText,
     });
   }
 

@@ -95,6 +95,18 @@ export default function QuestionDetailModal({
             </div>
           </div>
 
+          {/* Question Text */}
+          {result.questionText && (
+            <div className="rounded-2xl bg-slate-800/20 border border-slate-700/50 p-5">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Question Text
+              </h4>
+              <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                {result.questionText}
+              </p>
+            </div>
+          )}
+
           {/* Options Table */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -143,10 +155,15 @@ export default function QuestionDetailModal({
 
                     return (
                       <tr key={optId} className={`transition-colors ${rowClass}`}>
-                        <td className="px-4 py-3 font-semibold text-slate-350">
-                          Option {optionNum}
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-350">Option {optionNum}</div>
+                          {result.optionsText && result.optionsText[index] && (
+                            <div className="mt-1 text-sm text-slate-300 whitespace-pre-wrap">
+                              {result.optionsText[index]}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-400 align-top">
                           {optId || <span className="italic text-slate-600">ID not found</span>}
                         </td>
                         <td className="px-4 py-3 text-right">

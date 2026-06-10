@@ -14,19 +14,10 @@ const CHOSEN_RE = /^Chosen\s+Option\s*:\s*(-{1,2}|[1-4])/i;
 // "Section : History"
 const SECTION_RE = /^Section\s*:\s*(.+)/i;
 
-// ─── Parser ───────────────────────────────────────────────────────────────────
+const STATUS_RE = /^Status\s*:\s*(.+)/i;
 
 /**
  * Parse the raw text from the NTA CUET Response Sheet PDF.
- *
- * The PDF text has blocks like:
- *   Question ID : 226895795715
- *   Option 1 ID : 2268953085921
- *   Option 2 ID : 2268953085922
- *   Option 3 ID : 2268953085923
- *   Option 4 ID : 2268953085924
- *   Status : Answered
- *   Chosen Option : 4
  */
 export function parseResponseSheet(text: string): ResponseSheetMap {
   const map: ResponseSheetMap = new Map();
@@ -42,6 +33,9 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
   let chosen = 0;
   const opts: string[] = new Array(4).fill("");
   let currentSubject = "Unknown Subject";
+  
+  let textBuffer: string[] = [];
+  let parsedTextData = { questionText: "", optionsText: ["", "", "", ""] };
 
   const flush = () => {
     if (currentId && opts.some(Boolean)) {
@@ -50,8 +44,44 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
         chosenOptionIndex: chosen,
         optionIds: [...opts],
         subject: currentSubject,
+        questionText: parsedTextData.questionText,
+        optionsText: [...parsedTextData.optionsText],
       });
     }
+  };
+
+  const parseQuestionTextBlock = (lines: string[]) => {
+    let qText: string[] = [];
+    let oText = ["", "", "", ""];
+    let currentOpt = -1;
+    
+    for (const line of lines) {
+      const optMatch1 = line.match(/^Options?\s*1\.\s*(.*)/i);
+      const optMatchN = line.match(/^([1-4])\.\s*(.*)/);
+      
+      if (optMatch1) {
+        currentOpt = 0;
+        oText[currentOpt] = optMatch1[1];
+      } else if (optMatchN) {
+        const idx = parseInt(optMatchN[1], 10) - 1;
+        currentOpt = idx;
+        oText[currentOpt] = optMatchN[2];
+      } else {
+        if (currentOpt >= 0) {
+          oText[currentOpt] += "\n" + line;
+        } else {
+          // It's question text. Ignore "Q.1" or "Q. 1"
+          if (!line.match(/^Q\.\s*\d+/i) && !line.match(/^Question\s+Description/i)) {
+            qText.push(line);
+          }
+        }
+      }
+    }
+    
+    return {
+      questionText: qText.join("\n").trim(),
+      optionsText: oText.map(o => o.trim())
+    };
   };
 
   for (const line of lines) {
@@ -59,6 +89,12 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
     const sm = line.match(SECTION_RE);
     if (sm) {
       currentSubject = sm[1].trim();
+      textBuffer = []; // reset buffer on new section
+      continue;
+    }
+
+    // Ignore Status
+    if (line.match(STATUS_RE)) {
       continue;
     }
 
@@ -69,6 +105,8 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
       currentId = qm[1];
       chosen = 0;
       opts.fill("");
+      parsedTextData = parseQuestionTextBlock(textBuffer);
+      textBuffer = [];
       continue;
     }
 
@@ -87,6 +125,9 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
       chosen = raw.startsWith("-") ? 0 : parseInt(raw, 10);
       continue;
     }
+    
+    // If not matched by any metadata regex, it belongs to the text block
+    textBuffer.push(line);
   }
 
   flush(); // last question

@@ -10,6 +10,10 @@ export interface ResponseSheetEntry {
   optionIds: string[];
   /** Subject/Section of the question, e.g. "History" */
   subject: string;
+  /** Full text of the question */
+  questionText?: string;
+  /** Text for each option [opt1Text, opt2Text, opt3Text, opt4Text] */
+  optionsText?: string[];
 }
 
 /** Full parsed response sheet: questionId → entry */
@@ -54,6 +58,10 @@ export interface ComparisonResult {
   optionIds: string[];
   /** Chosen option index: 1-4 (0 if skipped) */
   chosenOptionIndex: number;
+  /** Full text of the question */
+  questionText?: string;
+  /** Text for each option [opt1Text, opt2Text, opt3Text, opt4Text] */
+  optionsText?: string[];
 }
 
 /** Score summary shown in the summary card */
