@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, MinusCircle, AlertCircle, ChevronUp, ChevronDown,
 
 interface ResultsTableProps {
   results: ComparisonResult[];
+  onQuestionClick?: (questionId: string) => void;
 }
 
 type FilterStatus = "all" | QuestionStatus;
@@ -44,7 +45,7 @@ const STATUS_CONFIG: Record<
 
 const PAGE_SIZE = 25;
 
-export default function ResultsTable({ results }: ResultsTableProps) {
+export default function ResultsTable({ results, onQuestionClick }: ResultsTableProps) {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [sortField, setSortField] = useState<SortField>("status");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -198,8 +199,18 @@ export default function ResultsTable({ results }: ResultsTableProps) {
                   <td className="px-4 py-3 text-slate-500 tabular-nums text-xs">
                     {rowNumber}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-300 tracking-tight">
-                    {row.questionId}
+                  <td className="px-4 py-3 font-mono text-xs tracking-tight">
+                    {onQuestionClick ? (
+                      <button
+                        onClick={() => onQuestionClick(row.questionId)}
+                        className="text-violet-400 hover:text-violet-300 hover:underline transition-all font-semibold text-left"
+                        title="Click to view question"
+                      >
+                        {row.questionId}
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">{row.questionId}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-200 text-sm">
                     {row.yourAnswer}

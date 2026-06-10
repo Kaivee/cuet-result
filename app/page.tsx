@@ -1,11 +1,20 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import dynamic from "next/dynamic";
 import FileUpload from "@/components/FileUpload";
 import SummaryCard from "@/components/SummaryCard";
 import ResultsTable from "@/components/ResultsTable";
-import type { CompareApiResponse } from "@/types";
+import SubjectBreakdown from "@/components/SubjectBreakdown";
+import type { CompareApiResponse, ResponseSheetMap, AnswerKeyMap } from "@/types";
 import { BookOpen, Zap, AlertTriangle, RotateCcw, ChevronDown, Info } from "lucide-react";
+import { parseResponseSheet } from "@/lib/parseResponseSheet";
+import { parseAnswerKey } from "@/lib/parseAnswerKey";
+import { compareAnswers, calculateStats, calculateSubjectStats } from "@/lib/compareAnswers";
+
+const QuestionModal = dynamic(() => import("@/components/QuestionModal"), {
+  ssr: false,
+});
 
 type AppState = "idle" | "loading" | "results" | "error";
 
@@ -15,6 +24,9 @@ export default function HomePage() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [results, setResults] = useState<CompareApiResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [selectedSubject, setSelectedSubject] = useState<string>("All");
+  const [questionLocations, setQuestionLocations] = useState<Record<string, { file: File; pageNumber: number }>>({});
+  const [activeQuestion, setActiveQuestion] = useState<{ file: File; pageNumber: number; questionId: string } | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const canSubmit = responseSheets.length > 0 && answerKeys.length > 0;
@@ -24,35 +36,84 @@ export default function HomePage() {
     setAppState("loading");
     setErrorMsg("");
 
-    const formData = new FormData();
-    for (const file of responseSheets) {
-      formData.append("responseSheets", file);
-    }
-    for (const file of answerKeys) {
-      formData.append("answerKeys", file);
-    }
-
     try {
-      const res = await fetch("/api/compare", {
-        method: "POST",
-        body: formData,
-      });
+      // Dynamically import client-side text extractor to prevent SSR execution during build
+      const { extractTextFromPdf } = await import("@/lib/extractTextClient");
 
-      const data = await res.json();
+      // 1. Extract text and map question page locations from PDFs
+      const newLocations: Record<string, { file: File; pageNumber: number }> = {};
+      const responseTexts = await Promise.all(
+        responseSheets.map(async (file) => {
+          const data = await extractTextFromPdf(file);
+          for (const [qid, pageNum] of Object.entries(data.questionPages)) {
+            newLocations[qid] = { file, pageNumber: pageNum };
+          }
+          return data.text;
+        })
+      );
+      const answerKeyTexts = await Promise.all(
+        answerKeys.map(async (file) => {
+          const data = await extractTextFromPdf(file);
+          return data.text;
+        })
+      );
 
-      if (!res.ok) {
-        throw new Error(data.error ?? "Unknown error from server.");
+      setQuestionLocations(newLocations);
+
+      // 2. Parse and merge all Response Sheets
+      const mergedResponseSheet: ResponseSheetMap = new Map();
+      for (const text of responseTexts) {
+        const parsed = parseResponseSheet(text);
+        for (const [qid, entry] of parsed) {
+          if (!mergedResponseSheet.has(qid)) {
+            mergedResponseSheet.set(qid, entry);
+          }
+        }
       }
 
-      setResults(data as CompareApiResponse);
+      if (mergedResponseSheet.size === 0) {
+        throw new Error(
+          "Could not parse any Response Sheet PDF. Please upload the official NTA CUET Response Sheet (not the Question Paper)."
+        );
+      }
+
+      // 3. Parse and merge all Answer Keys
+      const mergedAnswerKey: AnswerKeyMap = new Map();
+      for (const text of answerKeyTexts) {
+        const parsed = parseAnswerKey(text);
+        for (const [qid, entry] of parsed) {
+          if (!mergedAnswerKey.has(qid)) {
+            mergedAnswerKey.set(qid, entry);
+          }
+        }
+      }
+
+      if (mergedAnswerKey.size === 0) {
+        throw new Error(
+          "Could not parse any Answer Key PDF. Please upload the official NTA CUET Answer Key PDF."
+        );
+      }
+
+      // 4. Compare answers and calculate stats
+      const resultsList = compareAnswers(mergedResponseSheet, mergedAnswerKey);
+      const stats = calculateStats(resultsList);
+      const subjectStats = calculateSubjectStats(resultsList);
+
+      setResults({
+        results: resultsList,
+        stats,
+        subjectStats,
+      } as CompareApiResponse);
       setAppState("results");
+      setSelectedSubject("All");
 
       // Smooth scroll to results
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+      console.error("Local comparison error:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong during local comparison.");
       setAppState("error");
     }
   };
@@ -63,8 +124,28 @@ export default function HomePage() {
     setResults(null);
     setAppState("idle");
     setErrorMsg("");
+    setSelectedSubject("All");
+    setQuestionLocations({});
+    setActiveQuestion(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const handleQuestionClick = (questionId: string) => {
+    const loc = questionLocations[questionId];
+    if (loc) {
+      setActiveQuestion({
+        file: loc.file,
+        pageNumber: loc.pageNumber,
+        questionId,
+      });
+    }
+  };
+
+  const filteredResults = results
+    ? selectedSubject === "All"
+      ? results.results
+      : results.results.filter((r) => r.subject === selectedSubject)
+    : [];
 
   return (
     <main className="min-h-screen">
@@ -229,7 +310,37 @@ export default function HomePage() {
             )}
 
             <SummaryCard stats={results.stats} />
-            <ResultsTable results={results.results} />
+
+            {results.subjectStats && results.subjectStats.length > 0 && (
+              <SubjectBreakdown
+                subjectStats={results.subjectStats}
+                selectedSubject={selectedSubject}
+                onSelectSubject={setSelectedSubject}
+              />
+            )}
+
+            <div className="border-t border-slate-700/60 pt-6 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-slate-300 tracking-wide uppercase">
+                  Detailed Comparison {selectedSubject !== "All" && `(${selectedSubject})`}
+                </h3>
+                {selectedSubject !== "All" && (
+                  <span className="text-xs bg-violet-500/20 text-violet-300 border border-violet-500/30 px-3 py-1 rounded-full font-medium animate-pulse">
+                    Filtered by {selectedSubject}
+                  </span>
+                )}
+              </div>
+              <ResultsTable results={filteredResults} onQuestionClick={handleQuestionClick} />
+            </div>
+
+            {activeQuestion && (
+              <QuestionModal
+                file={activeQuestion.file}
+                pageNumber={activeQuestion.pageNumber}
+                questionId={activeQuestion.questionId}
+                onClose={() => setActiveQuestion(null)}
+              />
+            )}
 
             {/* Reset button */}
             <div className="flex justify-center pt-4">

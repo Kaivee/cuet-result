@@ -11,6 +11,9 @@ const OPT_ID_RE = /^Option\s+([1-4])\s+ID\s*:\s*(\d{9,})/i;
 // "Chosen Option : 4"  OR  "Chosen Option : --"
 const CHOSEN_RE = /^Chosen\s+Option\s*:\s*(-{1,2}|[1-4])/i;
 
+// "Section : History"
+const SECTION_RE = /^Section\s*:\s*(.+)/i;
+
 // ─── Parser ───────────────────────────────────────────────────────────────────
 
 /**
@@ -38,6 +41,7 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
   let currentId: string | null = null;
   let chosen = 0;
   const opts: string[] = new Array(4).fill("");
+  let currentSubject = "Unknown Subject";
 
   const flush = () => {
     if (currentId && opts.some(Boolean)) {
@@ -45,11 +49,19 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
         questionId: currentId,
         chosenOptionIndex: chosen,
         optionIds: [...opts],
+        subject: currentSubject,
       });
     }
   };
 
   for (const line of lines) {
+    // ── Section Name ─────────────────────────────────────────────────────────
+    const sm = line.match(SECTION_RE);
+    if (sm) {
+      currentSubject = sm[1].trim();
+      continue;
+    }
+
     // ── Question ID ──────────────────────────────────────────────────────────
     const qm = line.match(Q_ID_RE);
     if (qm) {

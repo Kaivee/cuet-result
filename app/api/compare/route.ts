@@ -2,7 +2,7 @@ import "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { NextRequest, NextResponse } from "next/server";
 import { parseResponseSheet } from "@/lib/parseResponseSheet";
 import { parseAnswerKey } from "@/lib/parseAnswerKey";
-import { compareAnswers, calculateStats } from "@/lib/compareAnswers";
+import { compareAnswers, calculateStats, calculateSubjectStats } from "@/lib/compareAnswers";
 import type {
   CompareApiResponse,
   CompareApiError,
@@ -134,10 +134,12 @@ export async function POST(
     // ── Compare & return ─────────────────────────────────────────────────────
     const results = compareAnswers(mergedResponseSheet, mergedAnswerKey);
     const stats = calculateStats(results);
+    const subjectStats = calculateSubjectStats(results);
 
     return NextResponse.json({
       results,
       stats,
+      subjectStats,
       meta: {
         responseSheetFiles: rsFiles.map((f) => f.name),
         answerKeyFiles: akFiles.map((f) => f.name),

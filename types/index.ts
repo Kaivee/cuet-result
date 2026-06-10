@@ -8,6 +8,8 @@ export interface ResponseSheetEntry {
   chosenOptionIndex: number;
   /** The four option IDs in order: [opt1, opt2, opt3, opt4] */
   optionIds: string[];
+  /** Subject/Section of the question, e.g. "History" */
+  subject: string;
 }
 
 /** Full parsed response sheet: questionId → entry */
@@ -46,6 +48,8 @@ export interface ComparisonResult {
   /** The raw correct option ID from the key */
   correctOptionId: string;
   status: QuestionStatus;
+  /** Subject/Section of the question */
+  subject: string;
 }
 
 /** Score summary shown in the summary card */
@@ -61,11 +65,19 @@ export interface SummaryStats {
   cuetScore: number;
 }
 
+// ─── Subject Stats Types ──────────────────────────────────────────────────────
+
+export interface SubjectStats {
+  subject: string;
+  stats: SummaryStats;
+}
+
 // ─── API Types ────────────────────────────────────────────────────────────────
 
 export interface CompareApiResponse {
   results: ComparisonResult[];
   stats: SummaryStats;
+  subjectStats: SubjectStats[];
 }
 
 export interface CompareApiError {

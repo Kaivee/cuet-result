@@ -4,6 +4,7 @@ import type {
   ComparisonResult,
   SummaryStats,
   QuestionStatus,
+  SubjectStats,
 } from "@/types";
 
 // ─── CUET Scoring Constants ───────────────────────────────────────────────────
@@ -88,6 +89,7 @@ export function compareAnswers(
       chosenOptionId,
       correctOptionId,
       status,
+      subject: responseEntry.subject,
     });
   }
 
@@ -150,4 +152,35 @@ export function calculateStats(results: ComparisonResult[]): SummaryStats {
     percentage,
     cuetScore,
   };
+}
+
+/**
+ * Calculate statistics grouped by subject/section.
+ */
+export function calculateSubjectStats(
+  results: ComparisonResult[]
+): SubjectStats[] {
+  const subjectGroups: Record<string, ComparisonResult[]> = {};
+
+  for (const r of results) {
+    if (!subjectGroups[r.subject]) {
+      subjectGroups[r.subject] = [];
+    }
+    subjectGroups[r.subject].push(r);
+  }
+
+  const subjectStatsList: SubjectStats[] = [];
+
+  for (const [subject, subjectResults] of Object.entries(subjectGroups)) {
+    const stats = calculateStats(subjectResults);
+    subjectStatsList.push({
+      subject,
+      stats,
+    });
+  }
+
+  // Sort subjects alphabetically
+  subjectStatsList.sort((a, b) => a.subject.localeCompare(b.subject));
+
+  return subjectStatsList;
 }
