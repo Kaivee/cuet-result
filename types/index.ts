@@ -50,6 +50,10 @@ export interface ComparisonResult {
   status: QuestionStatus;
   /** Subject/Section of the question */
   subject: string;
+  /** All 4 option IDs from the response sheet */
+  optionIds: string[];
+  /** Chosen option index: 1-4 (0 if skipped) */
+  chosenOptionIndex: number;
 }
 
 /** Score summary shown in the summary card */

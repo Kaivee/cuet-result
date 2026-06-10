@@ -1,20 +1,16 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import dynamic from "next/dynamic";
 import FileUpload from "@/components/FileUpload";
 import SummaryCard from "@/components/SummaryCard";
 import ResultsTable from "@/components/ResultsTable";
 import SubjectBreakdown from "@/components/SubjectBreakdown";
-import type { CompareApiResponse, ResponseSheetMap, AnswerKeyMap } from "@/types";
+import QuestionDetailModal from "@/components/QuestionDetailModal";
+import type { CompareApiResponse, ResponseSheetMap, AnswerKeyMap, ComparisonResult } from "@/types";
 import { BookOpen, Zap, AlertTriangle, RotateCcw, ChevronDown, Info } from "lucide-react";
 import { parseResponseSheet } from "@/lib/parseResponseSheet";
 import { parseAnswerKey } from "@/lib/parseAnswerKey";
 import { compareAnswers, calculateStats, calculateSubjectStats } from "@/lib/compareAnswers";
-
-const QuestionModal = dynamic(() => import("@/components/QuestionModal"), {
-  ssr: false,
-});
 
 type AppState = "idle" | "loading" | "results" | "error";
 
@@ -25,8 +21,7 @@ export default function HomePage() {
   const [results, setResults] = useState<CompareApiResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("All");
-  const [questionLocations, setQuestionLocations] = useState<Record<string, { file: File; pageNumber: number }>>({});
-  const [activeQuestion, setActiveQuestion] = useState<{ file: File; pageNumber: number; questionId: string } | null>(null);
+  const [activeQuestion, setActiveQuestion] = useState<ComparisonResult | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const canSubmit = responseSheets.length > 0 && answerKeys.length > 0;
@@ -40,25 +35,13 @@ export default function HomePage() {
       // Dynamically import client-side text extractor to prevent SSR execution during build
       const { extractTextFromPdf } = await import("@/lib/extractTextClient");
 
-      // 1. Extract text and map question page locations from PDFs
-      const newLocations: Record<string, { file: File; pageNumber: number }> = {};
+      // 1. Extract text from all PDFs
       const responseTexts = await Promise.all(
-        responseSheets.map(async (file) => {
-          const data = await extractTextFromPdf(file);
-          for (const [qid, pageNum] of Object.entries(data.questionPages)) {
-            newLocations[qid] = { file, pageNumber: pageNum };
-          }
-          return data.text;
-        })
+        responseSheets.map((file) => extractTextFromPdf(file))
       );
       const answerKeyTexts = await Promise.all(
-        answerKeys.map(async (file) => {
-          const data = await extractTextFromPdf(file);
-          return data.text;
-        })
+        answerKeys.map((file) => extractTextFromPdf(file))
       );
-
-      setQuestionLocations(newLocations);
 
       // 2. Parse and merge all Response Sheets
       const mergedResponseSheet: ResponseSheetMap = new Map();
@@ -125,20 +108,12 @@ export default function HomePage() {
     setAppState("idle");
     setErrorMsg("");
     setSelectedSubject("All");
-    setQuestionLocations({});
     setActiveQuestion(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleQuestionClick = (questionId: string) => {
-    const loc = questionLocations[questionId];
-    if (loc) {
-      setActiveQuestion({
-        file: loc.file,
-        pageNumber: loc.pageNumber,
-        questionId,
-      });
-    }
+  const handleQuestionClick = (result: ComparisonResult) => {
+    setActiveQuestion(result);
   };
 
   const filteredResults = results
@@ -334,10 +309,8 @@ export default function HomePage() {
             </div>
 
             {activeQuestion && (
-              <QuestionModal
-                file={activeQuestion.file}
-                pageNumber={activeQuestion.pageNumber}
-                questionId={activeQuestion.questionId}
+              <QuestionDetailModal
+                result={activeQuestion}
                 onClose={() => setActiveQuestion(null)}
               />
             )}

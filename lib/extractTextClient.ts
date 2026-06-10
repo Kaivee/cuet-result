@@ -1,16 +1,11 @@
 import { PDFParse } from "pdf-parse";
 
-export interface ExtractedPdfData {
-  text: string;
-  questionPages: Record<string, number>;
-}
-
 /**
- * Extract plain text and map question IDs to page numbers from a PDF File object
- * on the client side. This ensures layout and page mapping are identical to the
- * backend parser.
+ * Extract plain text from a PDF File object on the client side using the
+ * browser-compatible build of pdf-parse. This ensures layout and newline
+ * preservation are identical to the backend parser.
  */
-export async function extractTextFromPdf(file: File): Promise<ExtractedPdfData> {
+export async function extractTextFromPdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const parser = new PDFParse({ data: new Uint8Array(arrayBuffer) });
 
@@ -19,19 +14,5 @@ export async function extractTextFromPdf(file: File): Promise<ExtractedPdfData> 
 
   const result = await parser.getText();
   await parser.destroy();
-
-  const questionPages: Record<string, number> = {};
-  for (const page of result.pages) {
-    const pageNum = page.num;
-    const matches = page.text.matchAll(/Question\s+ID\s*:\s*(\d{9,})/ig);
-    for (const match of matches) {
-      const qid = match[1];
-      questionPages[qid] = pageNum;
-    }
-  }
-
-  return {
-    text: result.text,
-    questionPages,
-  };
+  return result.text;
 }

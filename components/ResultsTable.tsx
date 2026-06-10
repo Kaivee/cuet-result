@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, MinusCircle, AlertCircle, ChevronUp, ChevronDown,
 
 interface ResultsTableProps {
   results: ComparisonResult[];
-  onQuestionClick?: (questionId: string) => void;
+  onQuestionClick?: (result: ComparisonResult) => void;
 }
 
 type FilterStatus = "all" | QuestionStatus;
@@ -202,7 +202,7 @@ export default function ResultsTable({ results, onQuestionClick }: ResultsTableP
                   <td className="px-4 py-3 font-mono text-xs tracking-tight">
                     {onQuestionClick ? (
                       <button
-                        onClick={() => onQuestionClick(row.questionId)}
+                        onClick={() => onQuestionClick(row)}
                         className="text-violet-400 hover:text-violet-300 hover:underline transition-all font-semibold text-left"
                         title="Click to view question"
                       >

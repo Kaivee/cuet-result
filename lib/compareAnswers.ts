@@ -90,6 +90,8 @@ export function compareAnswers(
       correctOptionId,
       status,
       subject: responseEntry.subject,
+      optionIds: [...optionIds],
+      chosenOptionIndex,
     });
   }
 
