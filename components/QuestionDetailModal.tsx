@@ -1,18 +1,40 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import type { ComparisonResult } from "@/types";
-import { X, CheckCircle2, XCircle, MinusCircle, AlertCircle, HelpCircle } from "lucide-react";
+import { X, CheckCircle2, XCircle, MinusCircle, AlertCircle, HelpCircle, Loader2 } from "lucide-react";
+import { extractQuestionImage } from "@/lib/extractQuestionImage";
 
 interface QuestionDetailModalProps {
   result: ComparisonResult;
+  responseSheets?: File[];
   onClose: () => void;
 }
 
 export default function QuestionDetailModal({
   result,
+  responseSheets = [],
   onClose,
 }: QuestionDetailModalProps) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isExtractingImage, setIsExtractingImage] = useState(false);
+
+  useEffect(() => {
+    async function fetchImage() {
+      if (responseSheets.length === 0) return;
+      setIsExtractingImage(true);
+      try {
+        const img = await extractQuestionImage(responseSheets[0], result.questionId);
+        if (img) setImageUrl(img);
+      } catch (err) {
+        console.error("Failed to extract image", err);
+      } finally {
+        setIsExtractingImage(false);
+      }
+    }
+    fetchImage();
+  }, [result.questionId, responseSheets]);
+
   const {
     questionId,
     yourAnswer,
@@ -95,15 +117,31 @@ export default function QuestionDetailModal({
             </div>
           </div>
 
-          {/* Question Text */}
-          {result.questionText && (
+          {/* Question Text / Image */}
+          {(result.questionText || isExtractingImage || imageUrl) && (
             <div className="rounded-2xl bg-slate-800/20 border border-slate-700/50 p-5">
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Question Text
+                Question Details
               </h4>
-              <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                {result.questionText}
-              </p>
+              
+              {result.questionText && (
+                <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed mb-4">
+                  {result.questionText}
+                </p>
+              )}
+
+              {isExtractingImage && (
+                <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Extracting embedded images...
+                </div>
+              )}
+
+              {imageUrl && !isExtractingImage && (
+                <div className="mt-2 rounded-xl overflow-hidden border border-slate-700/50 bg-white p-2">
+                  <img src={imageUrl} alt="Question Snippet" className="max-w-full h-auto object-contain" />
+                </div>
+              )}
             </div>
           )}
 

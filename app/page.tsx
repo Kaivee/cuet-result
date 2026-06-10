@@ -311,6 +311,7 @@ export default function HomePage() {
             {activeQuestion && (
               <QuestionDetailModal
                 result={activeQuestion}
+                responseSheets={responseSheets}
                 onClose={() => setActiveQuestion(null)}
               />
             )}
