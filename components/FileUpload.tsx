@@ -6,8 +6,8 @@ import { FileText, Upload, X, CheckCircle } from "lucide-react";
 interface FileUploadProps {
   label: string;
   description: string;
-  file: File | null;
-  onFileChange: (file: File | null) => void;
+  files: File[];
+  onFilesChange: (files: File[]) => void;
   id: string;
   accentColor: "violet" | "indigo";
 }
@@ -15,8 +15,8 @@ interface FileUploadProps {
 export default function FileUpload({
   label,
   description,
-  file,
-  onFileChange,
+  files,
+  onFilesChange,
   id,
   accentColor,
 }: FileUploadProps) {
@@ -55,21 +55,33 @@ export default function FileUpload({
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      const dropped = e.dataTransfer.files[0];
-      if (dropped && dropped.name.toLowerCase().endsWith(".pdf")) {
-        onFileChange(dropped);
+      const droppedFiles = Array.from(e.dataTransfer.files).filter((f) =>
+        f.name.toLowerCase().endsWith(".pdf")
+      );
+      if (droppedFiles.length > 0) {
+        onFilesChange([...files, ...droppedFiles]);
       }
     },
-    [onFileChange]
+    [onFilesChange, files]
   );
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = e.target.files?.[0];
-      if (selected) onFileChange(selected);
+      const selected = Array.from(e.target.files ?? []);
+      if (selected.length > 0) {
+        onFilesChange([...files, ...selected]);
+      }
       e.target.value = "";
     },
-    [onFileChange]
+    [onFilesChange, files]
+  );
+
+  const removeFile = useCallback(
+    (index: number) => {
+      const updated = files.filter((_, i) => i !== index);
+      onFilesChange(updated);
+    },
+    [onFilesChange, files]
   );
 
   const formatSize = (bytes: number) => {
@@ -85,80 +97,93 @@ export default function FileUpload({
       </label>
       <p className="text-xs text-slate-400 -mt-1">{description}</p>
 
-      {file ? (
-        /* ── File Selected State ─────────────────────────────────────────── */
-        <div
-          className={`relative flex items-center gap-4 rounded-2xl border ${accent.border} ${accent.bg} p-4 shadow-lg ${accent.glow} transition-all duration-300`}
-        >
-          <div className={`rounded-xl p-3 ${accent.badge}`}>
-            <FileText className={`h-6 w-6 ${accent.icon}`} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-100 truncate">
-              {file.name}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {formatSize(file.size)}
-            </p>
-          </div>
-          <CheckCircle className={`h-5 w-5 ${accent.text} flex-shrink-0`} />
-          <button
-            onClick={() => onFileChange(null)}
-            className="absolute -top-2 -right-2 rounded-full bg-slate-700 border border-slate-600 p-1 hover:bg-red-500/80 hover:border-red-500 transition-all duration-200"
-            aria-label="Remove file"
-          >
-            <X className="h-3 w-3 text-slate-300" />
-          </button>
-        </div>
-      ) : (
-        /* ── Drop Zone ───────────────────────────────────────────────────── */
-        <div
-          id={id}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          className={`
-            relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 cursor-pointer
-            transition-all duration-300 group
-            ${
-              isDragging
-                ? `${accent.border} ${accent.bg} ring-4 ${accent.ring} scale-[1.02]`
-                : "border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800"
-            }
-          `}
-        >
-          <div
-            className={`rounded-2xl p-4 transition-all duration-300 ${
-              isDragging ? accent.bg : "bg-slate-700/50 group-hover:bg-slate-700"
-            }`}
-          >
-            <Upload
-              className={`h-8 w-8 transition-all duration-300 ${
-                isDragging ? accent.text : "text-slate-400 group-hover:text-slate-300"
-              }`}
-            />
-          </div>
-          <div className="text-center">
-            <p
-              className={`text-sm font-medium transition-colors duration-200 ${
-                isDragging ? accent.text : "text-slate-300"
-              }`}
+      {/* ── File List ─────────────────────────────────────────────── */}
+      {files.length > 0 && (
+        <div className="flex flex-col gap-2 mb-1">
+          {files.map((file, index) => (
+            <div
+              key={`${file.name}-${index}`}
+              className={`relative flex items-center gap-3 rounded-2xl border ${accent.border} ${accent.bg} p-3 shadow-lg ${accent.glow} transition-all duration-300`}
             >
-              {isDragging ? "Drop it here!" : "Drag & drop or click to browse"}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">PDF files only</p>
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".pdf"
-            onChange={handleInputChange}
-            className="sr-only"
-            aria-label={`Upload ${label}`}
-          />
+              <div className={`rounded-xl p-2.5 ${accent.badge}`}>
+                <FileText className={`h-5 w-5 ${accent.icon}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-100 truncate">
+                  {file.name}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {formatSize(file.size)}
+                </p>
+              </div>
+              <CheckCircle className={`h-4 w-4 ${accent.text} flex-shrink-0`} />
+              <button
+                onClick={() => removeFile(index)}
+                className="absolute -top-2 -right-2 rounded-full bg-slate-700 border border-slate-600 p-1 hover:bg-red-500/80 hover:border-red-500 transition-all duration-200"
+                aria-label="Remove file"
+              >
+                <X className="h-3 w-3 text-slate-300" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
+
+      {/* ── Drop Zone (always visible to allow adding more) ───────── */}
+      <div
+        id={id}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className={`
+          relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed cursor-pointer
+          transition-all duration-300 group
+          ${files.length > 0 ? "p-4" : "p-8"}
+          ${
+            isDragging
+              ? `${accent.border} ${accent.bg} ring-4 ${accent.ring} scale-[1.02]`
+              : "border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800"
+          }
+        `}
+      >
+        <div
+          className={`rounded-2xl p-3 transition-all duration-300 ${
+            isDragging ? accent.bg : "bg-slate-700/50 group-hover:bg-slate-700"
+          }`}
+        >
+          <Upload
+            className={`h-6 w-6 transition-all duration-300 ${
+              isDragging ? accent.text : "text-slate-400 group-hover:text-slate-300"
+            }`}
+          />
+        </div>
+        <div className="text-center">
+          <p
+            className={`text-sm font-medium transition-colors duration-200 ${
+              isDragging ? accent.text : "text-slate-300"
+            }`}
+          >
+            {isDragging
+              ? "Drop here!"
+              : files.length > 0
+              ? "Add more PDFs"
+              : "Drag & drop or click to browse"}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            PDF files only · Multiple files supported
+          </p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          multiple
+          onChange={handleInputChange}
+          className="sr-only"
+          aria-label={`Upload ${label}`}
+        />
+      </div>
     </div>
   );
 }

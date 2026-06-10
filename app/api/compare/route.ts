@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseResponseSheet } from "@/lib/parseResponseSheet";
 import { parseAnswerKey } from "@/lib/parseAnswerKey";
 import { compareAnswers, calculateStats } from "@/lib/compareAnswers";
-import type { CompareApiResponse, CompareApiError } from "@/types";
+import type {
+  CompareApiResponse,
+  CompareApiError,
+  ResponseSheetMap,
+  AnswerKeyMap,
+} from "@/types";
 
 // ─── pdf-parse helper (new v3 API) ───────────────────────────────────────────
 
@@ -28,48 +33,48 @@ export async function POST(
     // ── Parse multipart form data ────────────────────────────────────────────
     const formData = await request.formData();
 
-    const responseSheetFile = formData.get("responseSheet");
-    const answerKeyFile = formData.get("answerKey");
+    // Support multiple files: "responseSheets" and "answerKeys" (arrays)
+    // Also keep backwards compatibility with single "responseSheet" / "answerKey"
+    const rsFiles: File[] = [];
+    const akFiles: File[] = [];
 
-    if (!responseSheetFile || !(responseSheetFile instanceof File)) {
-      return NextResponse.json(
-        { error: "Missing file: responseSheet" },
-        { status: 400 }
-      );
-    }
-    if (!answerKeyFile || !(answerKeyFile instanceof File)) {
-      return NextResponse.json(
-        { error: "Missing file: answerKey" },
-        { status: 400 }
-      );
-    }
-
-    if (!responseSheetFile.name.toLowerCase().endsWith(".pdf")) {
-      return NextResponse.json(
-        { error: "Response Sheet must be a PDF file." },
-        { status: 400 }
-      );
-    }
-    if (!answerKeyFile.name.toLowerCase().endsWith(".pdf")) {
-      return NextResponse.json(
-        { error: "Answer Key must be a PDF file." },
-        { status: 400 }
-      );
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File && value.name.toLowerCase().endsWith(".pdf")) {
+        if (key === "responseSheet" || key === "responseSheets") {
+          rsFiles.push(value);
+        } else if (key === "answerKey" || key === "answerKeys") {
+          akFiles.push(value);
+        }
+      }
     }
 
-    // ── Extract text from both PDFs ──────────────────────────────────────────
-    let responseText: string;
-    let answerKeyText: string;
+    if (rsFiles.length === 0) {
+      return NextResponse.json(
+        { error: "Missing file: at least one Response Sheet PDF is required." },
+        { status: 400 }
+      );
+    }
+    if (akFiles.length === 0) {
+      return NextResponse.json(
+        { error: "Missing file: at least one Answer Key PDF is required." },
+        { status: 400 }
+      );
+    }
+
+    // ── Extract text from all PDFs ───────────────────────────────────────────
+    let responseTexts: string[];
+    let answerKeyTexts: string[];
 
     try {
-      const [rsBuffer, akBuffer] = await Promise.all([
-        responseSheetFile.arrayBuffer().then((ab) => Buffer.from(ab)),
-        answerKeyFile.arrayBuffer().then((ab) => Buffer.from(ab)),
-      ]);
-      [responseText, answerKeyText] = await Promise.all([
-        extractText(rsBuffer),
-        extractText(akBuffer),
-      ]);
+      const rsBuffers = await Promise.all(
+        rsFiles.map((f) => f.arrayBuffer().then((ab) => Buffer.from(ab)))
+      );
+      const akBuffers = await Promise.all(
+        akFiles.map((f) => f.arrayBuffer().then((ab) => Buffer.from(ab)))
+      );
+
+      responseTexts = await Promise.all(rsBuffers.map(extractText));
+      answerKeyTexts = await Promise.all(akBuffers.map(extractText));
     } catch (err) {
       return NextResponse.json(
         {
@@ -80,26 +85,44 @@ export async function POST(
       );
     }
 
-    // ── Parse Response Sheet ─────────────────────────────────────────────────
-    const responseSheet = parseResponseSheet(responseText);
-    if (responseSheet.size === 0) {
+    // ── Parse & merge all Response Sheets ────────────────────────────────────
+    const mergedResponseSheet: ResponseSheetMap = new Map();
+    for (const text of responseTexts) {
+      const parsed = parseResponseSheet(text);
+      for (const [qid, entry] of parsed) {
+        if (!mergedResponseSheet.has(qid)) {
+          mergedResponseSheet.set(qid, entry);
+        }
+      }
+    }
+
+    if (mergedResponseSheet.size === 0) {
       return NextResponse.json(
         {
           error:
-            "Could not parse the Response Sheet PDF. " +
+            "Could not parse any Response Sheet PDF. " +
             "Please upload the NTA CUET Response Sheet (not the Question Paper).",
         },
         { status: 422 }
       );
     }
 
-    // ── Parse Answer Key ─────────────────────────────────────────────────────
-    const answerKey = parseAnswerKey(answerKeyText);
-    if (answerKey.size === 0) {
+    // ── Parse & merge all Answer Keys ────────────────────────────────────────
+    const mergedAnswerKey: AnswerKeyMap = new Map();
+    for (const text of answerKeyTexts) {
+      const parsed = parseAnswerKey(text);
+      for (const [qid, entry] of parsed) {
+        if (!mergedAnswerKey.has(qid)) {
+          mergedAnswerKey.set(qid, entry);
+        }
+      }
+    }
+
+    if (mergedAnswerKey.size === 0) {
       return NextResponse.json(
         {
           error:
-            "Could not parse the Answer Key PDF. " +
+            "Could not parse any Answer Key PDF. " +
             "Please upload the official NTA CUET Answer Key PDF.",
         },
         { status: 422 }
@@ -107,10 +130,19 @@ export async function POST(
     }
 
     // ── Compare & return ─────────────────────────────────────────────────────
-    const results = compareAnswers(responseSheet, answerKey);
+    const results = compareAnswers(mergedResponseSheet, mergedAnswerKey);
     const stats = calculateStats(results);
 
-    return NextResponse.json({ results, stats });
+    return NextResponse.json({
+      results,
+      stats,
+      meta: {
+        responseSheetFiles: rsFiles.map((f) => f.name),
+        answerKeyFiles: akFiles.map((f) => f.name),
+        totalResponseQuestions: mergedResponseSheet.size,
+        totalAnswerKeyQuestions: mergedAnswerKey.size,
+      },
+    });
   } catch (err) {
     console.error("[/api/compare] Unexpected error:", err);
     return NextResponse.json(

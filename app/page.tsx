@@ -5,19 +5,19 @@ import FileUpload from "@/components/FileUpload";
 import SummaryCard from "@/components/SummaryCard";
 import ResultsTable from "@/components/ResultsTable";
 import type { CompareApiResponse } from "@/types";
-import { BookOpen, Zap, AlertTriangle, RotateCcw, ChevronDown } from "lucide-react";
+import { BookOpen, Zap, AlertTriangle, RotateCcw, ChevronDown, Info } from "lucide-react";
 
 type AppState = "idle" | "loading" | "results" | "error";
 
 export default function HomePage() {
-  const [responseSheet, setResponseSheet] = useState<File | null>(null);
-  const [answerKey, setAnswerKey] = useState<File | null>(null);
+  const [responseSheets, setResponseSheets] = useState<File[]>([]);
+  const [answerKeys, setAnswerKeys] = useState<File[]>([]);
   const [appState, setAppState] = useState<AppState>("idle");
   const [results, setResults] = useState<CompareApiResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const canSubmit = responseSheet !== null && answerKey !== null;
+  const canSubmit = responseSheets.length > 0 && answerKeys.length > 0;
 
   const handleCompare = async () => {
     if (!canSubmit) return;
@@ -25,8 +25,12 @@ export default function HomePage() {
     setErrorMsg("");
 
     const formData = new FormData();
-    formData.append("responseSheet", responseSheet!);
-    formData.append("answerKey", answerKey!);
+    for (const file of responseSheets) {
+      formData.append("responseSheets", file);
+    }
+    for (const file of answerKeys) {
+      formData.append("answerKeys", file);
+    }
 
     try {
       const res = await fetch("/api/compare", {
@@ -54,8 +58,8 @@ export default function HomePage() {
   };
 
   const handleReset = () => {
-    setResponseSheet(null);
-    setAnswerKey(null);
+    setResponseSheets([]);
+    setAnswerKeys([]);
     setResults(null);
     setAppState("idle");
     setErrorMsg("");
@@ -86,28 +90,37 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="text-lg text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Upload your Response Sheet and the official Answer Key PDF. We&apos;ll
-            extract, compare, and show your detailed results instantly.
+            Upload your Response Sheet(s) and Answer Key(s). We&apos;ll
+            automatically match subjects across files and show your detailed results.
           </p>
         </div>
 
         {/* ── Upload Card ──────────────────────────────────────────────────── */}
         <div className="rounded-3xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-xl shadow-2xl p-6 sm:p-8 mb-8">
+          {/* ── Tip banner ────────────────────────────────────────────── */}
+          <div className="flex items-start gap-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 p-3 mb-6">
+            <Info className="h-4 w-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-indigo-300/80 leading-relaxed">
+              <span className="font-semibold text-indigo-300">Tip:</span> You can upload multiple Response Sheets and Answer Keys at once.
+              We&apos;ll merge all subjects and automatically cross-match them — no need to pair files manually.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
             <FileUpload
               id="response-sheet-upload"
-              label="Response Sheet"
-              description="Your personalised NTA CUET response sheet PDF"
-              file={responseSheet}
-              onFileChange={setResponseSheet}
+              label="Response Sheets"
+              description="Your NTA CUET response sheet PDF(s)"
+              files={responseSheets}
+              onFilesChange={setResponseSheets}
               accentColor="violet"
             />
             <FileUpload
               id="answer-key-upload"
-              label="Answer Key"
-              description="The official NTA CUET answer key PDF"
-              file={answerKey}
-              onFileChange={setAnswerKey}
+              label="Answer Keys"
+              description="Official NTA CUET answer key PDF(s)"
+              files={answerKeys}
+              onFilesChange={setAnswerKeys}
               accentColor="indigo"
             />
           </div>
@@ -162,7 +175,7 @@ export default function HomePage() {
           {/* ── Helper text ─────────────────────────────────────────────────── */}
           {!canSubmit && appState === "idle" && (
             <p className="text-center text-xs text-slate-500 mt-3">
-              Upload both PDFs to enable comparison
+              Upload at least one Response Sheet and one Answer Key to compare
             </p>
           )}
         </div>
