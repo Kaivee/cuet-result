@@ -98,6 +98,15 @@ export function parseResponseSheet(text: string): ResponseSheetMap {
       continue;
     }
 
+    // Ignore junk header/footer lines from the PDF text layer
+    if (
+      line.match(/cdn3\.digialm\.com/i) ||
+      line.match(/^--\s*\d+\s+of\s+\d+\s*--$/i) ||
+      line.match(/^Comprehension:?$/i)
+    ) {
+      continue;
+    }
+
     // ── Question ID ──────────────────────────────────────────────────────────
     const qm = line.match(Q_ID_RE);
     if (qm) {
