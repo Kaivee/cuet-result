@@ -82,8 +82,14 @@ export default function QuestionDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity">
-      <div className="relative w-full max-w-2xl flex flex-col rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-2xl flex flex-col rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
           <div>
@@ -144,76 +150,6 @@ export default function QuestionDetailModal({
               )}
             </div>
           )}
-
-          {/* Options Table */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Options Breakdown
-            </h4>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/20 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase bg-slate-800/10">
-                    <th className="px-4 py-3 text-left w-24">Option</th>
-                    <th className="px-4 py-3 text-left">Option ID</th>
-                    <th className="px-4 py-3 text-right">Match</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {optionIds.map((optId, index) => {
-                    const optionNum = index + 1;
-                    const isChosen = chosenOptionIndex === optionNum;
-                    const isCorrect = optId === correctOptionId;
-
-                    let rowClass = "hover:bg-slate-805/20";
-                    let matchBadge = null;
-
-                    if (isChosen && isCorrect) {
-                      rowClass = "bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-300";
-                      matchBadge = (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          Your Choice & Correct
-                        </span>
-                      );
-                    } else if (isChosen) {
-                      rowClass = "bg-red-500/5 hover:bg-red-500/10 text-red-300";
-                      matchBadge = (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
-                          Your Choice
-                        </span>
-                      );
-                    } else if (isCorrect && status !== "missing_in_key") {
-                      rowClass = "bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-300";
-                      matchBadge = (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-emerald-400 border border-emerald-500/30">
-                          Correct Answer
-                        </span>
-                      );
-                    }
-
-                    return (
-                      <tr key={optId} className={`transition-colors ${rowClass}`}>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-350">Option {optionNum}</div>
-                          {result.optionsText && result.optionsText[index] && (
-                            <div className="mt-1 text-sm text-slate-300 whitespace-pre-wrap">
-                              {result.optionsText[index]}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-400 align-top">
-                          {optId || <span className="italic text-slate-600">ID not found</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {matchBadge}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* Quick Summary Alert */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400 flex items-start gap-3">
