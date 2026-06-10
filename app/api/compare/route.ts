@@ -1,3 +1,4 @@
+import "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { NextRequest, NextResponse } from "next/server";
 import { parseResponseSheet } from "@/lib/parseResponseSheet";
 import { parseAnswerKey } from "@/lib/parseAnswerKey";
@@ -76,6 +77,7 @@ export async function POST(
       responseTexts = await Promise.all(rsBuffers.map(extractText));
       answerKeyTexts = await Promise.all(akBuffers.map(extractText));
     } catch (err) {
+      console.error("PDF read error in Route:", err);
       return NextResponse.json(
         {
           error: "Failed to read PDF files. Ensure files are valid PDFs.",
